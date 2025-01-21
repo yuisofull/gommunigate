@@ -144,13 +144,13 @@ func NewGRPCClient(conn *grpc.ClientConn, logger log.Logger) userservice.Service
 func decodeGRPCCreateRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*pb.CreateRequest)
 	return userendpoint.CreateProfileRequest{
-		UUID:           &req.Uuid,
-		Email:          &req.Email,
-		PhoneNumber:    &req.Phone,
-		UserName:       &req.Name,
-		ProfilePicture: &req.Profile,
-		Bio:            &req.Bio,
-		AuthProvider:   &req.AuthProvider,
+		UUID:           stringPtrOrNil(req.Uuid),
+		Email:          stringPtrOrNil(req.Email),
+		PhoneNumber:    stringPtrOrNil(req.Phone),
+		UserName:       stringPtrOrNil(req.Name),
+		ProfilePicture: stringPtrOrNil(req.Profile),
+		Bio:            stringPtrOrNil(req.Bio),
+		AuthProvider:   stringPtrOrNil(req.AuthProvider),
 	}, nil
 }
 
@@ -158,7 +158,7 @@ func decodeGRPCCreateRequest(_ context.Context, grpcReq interface{}) (interface{
 // gRPC retrieve user request to a user-domain request. Primarily useful in a server.
 func decodeGRPCRetrieveRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*pb.RetrieveRequest)
-	return userendpoint.GetProfileRequest{UUID: req.Uuid}, nil
+	return userendpoint.GetProfileRequest{UUID: stringSafeDeref(&req.Uuid)}, nil
 }
 
 // decodeGRPCUpdateRequest is a transport/grpc.DecodeRequestFunc that converts a
@@ -166,12 +166,12 @@ func decodeGRPCRetrieveRequest(_ context.Context, grpcReq interface{}) (interfac
 func decodeGRPCUpdateRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*pb.UpdateRequest)
 	return userendpoint.UpdateProfileRequest{
-		UUID:           &req.Uuid,
-		Email:          &req.Email,
-		PhoneNumber:    &req.Phone,
-		UserName:       &req.Name,
-		ProfilePicture: &req.Profile,
-		Bio:            &req.Bio,
+		UUID:           stringPtrOrNil(req.Uuid),
+		Email:          stringPtrOrNil(req.Email),
+		PhoneNumber:    stringPtrOrNil(req.Phone),
+		UserName:       stringPtrOrNil(req.Name),
+		ProfilePicture: stringPtrOrNil(req.Profile),
+		Bio:            stringPtrOrNil(req.Bio),
 	}, nil
 }
 
@@ -179,7 +179,7 @@ func decodeGRPCUpdateRequest(_ context.Context, grpcReq interface{}) (interface{
 // gRPC delete user request to a user-domain request. Primarily useful in a server.
 func decodeGRPCDeleteRequest(_ context.Context, grpcReq interface{}) (interface{}, error) {
 	req := grpcReq.(*pb.DeleteRequest)
-	return userendpoint.DeleteProfileRequest{UUID: req.Uuid}, nil
+	return userendpoint.DeleteProfileRequest{UUID: stringSafeDeref(&req.Uuid)}, nil
 }
 
 // decodeGRPCCreateResponse is a transport/grpc.DecodeResponseFunc that converts a
@@ -194,12 +194,12 @@ func decodeGRPCCreateResponse(_ context.Context, grpcReply interface{}) (interfa
 func decodeGRPCRetrieveResponse(_ context.Context, grpcReply interface{}) (interface{}, error) {
 	reply := grpcReply.(*pb.RetrieveReply)
 	return userendpoint.GetProfileResponse{
-		UUID:           &reply.Uuid,
-		Email:          &reply.Email,
-		PhoneNumber:    &reply.Phone,
-		UserName:       &reply.Name,
-		ProfilePicture: &reply.Profile,
-		Bio:            &reply.Bio,
+		UUID:           stringPtrOrNil(reply.Uuid),
+		Email:          stringPtrOrNil(reply.Email),
+		PhoneNumber:    stringPtrOrNil(reply.Phone),
+		UserName:       stringPtrOrNil(reply.Name),
+		ProfilePicture: stringPtrOrNil(reply.Profile),
+		Bio:            stringPtrOrNil(reply.Bio),
 		Err:            str2err(reply.Err),
 	}, nil
 }
@@ -230,12 +230,12 @@ func encodeGRPCCreateResponse(_ context.Context, response interface{}) (interfac
 func encodeGRPCRetrieveResponse(_ context.Context, response interface{}) (interface{}, error) {
 	resp := response.(userendpoint.GetProfileResponse)
 	return &pb.RetrieveReply{
-		Uuid:    *resp.UUID,
-		Email:   *resp.Email,
-		Phone:   *resp.PhoneNumber,
-		Name:    *resp.UserName,
-		Profile: *resp.ProfilePicture,
-		Bio:     *resp.Bio,
+		Uuid:    stringSafeDeref(resp.UUID),
+		Email:   stringSafeDeref(resp.Email),
+		Phone:   stringSafeDeref(resp.PhoneNumber),
+		Name:    stringSafeDeref(resp.UserName),
+		Profile: stringSafeDeref(resp.ProfilePicture),
+		Bio:     stringSafeDeref(resp.Bio),
 		Err:     err2str(resp.Err),
 	}, nil
 }
@@ -259,13 +259,13 @@ func encodeGRPCDeleteResponse(_ context.Context, response interface{}) (interfac
 func encodeGRPCCreateRequest(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(userendpoint.CreateProfileRequest)
 	return &pb.CreateRequest{
-		Uuid:         *req.UUID,
-		Email:        *req.Email,
-		Phone:        *req.PhoneNumber,
-		Name:         *req.UserName,
-		Profile:      *req.ProfilePicture,
-		Bio:          *req.Bio,
-		AuthProvider: *req.AuthProvider,
+		Uuid:         stringSafeDeref(req.UUID),
+		Email:        stringSafeDeref(req.Email),
+		Phone:        stringSafeDeref(req.PhoneNumber),
+		Name:         stringSafeDeref(req.UserName),
+		Profile:      stringSafeDeref(req.ProfilePicture),
+		Bio:          stringSafeDeref(req.Bio),
+		AuthProvider: stringSafeDeref(req.AuthProvider),
 	}, nil
 }
 
@@ -273,7 +273,7 @@ func encodeGRPCCreateRequest(_ context.Context, request interface{}) (interface{
 // user-domain request to a gRPC retrieve user request. Primarily useful in a client.
 func encodeGRPCRetrieveRequest(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(userendpoint.GetProfileRequest)
-	return &pb.RetrieveRequest{Uuid: req.UUID}, nil
+	return &pb.RetrieveRequest{Uuid: stringSafeDeref(&req.UUID)}, nil
 }
 
 // encodeGRPCUpdateRequest is a transport/grpc.EncodeRequestFunc that converts a
@@ -281,12 +281,12 @@ func encodeGRPCRetrieveRequest(_ context.Context, request interface{}) (interfac
 func encodeGRPCUpdateRequest(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(userendpoint.UpdateProfileRequest)
 	return &pb.UpdateRequest{
-		Uuid:    *req.UUID,
-		Email:   *req.Email,
-		Phone:   *req.PhoneNumber,
-		Name:    *req.UserName,
-		Profile: *req.ProfilePicture,
-		Bio:     *req.Bio,
+		Uuid:    stringSafeDeref(req.UUID),
+		Email:   stringSafeDeref(req.Email),
+		Phone:   stringSafeDeref(req.PhoneNumber),
+		Name:    stringSafeDeref(req.UserName),
+		Profile: stringSafeDeref(req.ProfilePicture),
+		Bio:     stringSafeDeref(req.Bio),
 	}, nil
 }
 
@@ -294,7 +294,7 @@ func encodeGRPCUpdateRequest(_ context.Context, request interface{}) (interface{
 // user-domain request to a gRPC delete user request. Primarily useful in a client.
 func encodeGRPCDeleteRequest(_ context.Context, request interface{}) (interface{}, error) {
 	req := request.(userendpoint.DeleteProfileRequest)
-	return &pb.DeleteRequest{Uuid: req.UUID}, nil
+	return &pb.DeleteRequest{Uuid: stringSafeDeref(&req.UUID)}, nil
 }
 
 func str2err(s string) error {
@@ -309,4 +309,18 @@ func err2str(err error) string {
 		return ""
 	}
 	return err.Error()
+}
+
+func stringPtrOrNil(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func stringSafeDeref(ptr *string) string {
+	if ptr == nil {
+		return ""
+	}
+	return *ptr
 }

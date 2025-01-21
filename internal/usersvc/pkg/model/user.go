@@ -2,11 +2,11 @@ package model
 
 type User struct {
 	ID             *string `json:"id,omitempty"`
-	UUID           *string `json:"uuid"`
-	Email          *string `json:"email"`
-	PhoneNumber    *string `json:"phoneNumber"`
-	UserName       *string `json:"userName"`
-	ProfilePicture *string `json:"profilePicture"`
-	Bio            *string `json:"bio"`
-	AuthProvider   *string `json:"authProvider"`
+	UUID           *string `json:"uuid,omitempty"`
+	Email          *string `json:"email,omitempty"`
+	PhoneNumber    *string `json:"phoneNumber,omitempty"`
+	UserName       *string `json:"userName,omitempty"`
+	ProfilePicture *string `json:"profilePicture,omitempty"`
+	Bio            *string `json:"bio,omitempty"`
+	AuthProvider   *string `json:"authProvider,omitempty"`
 }

@@ -2,11 +2,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
-	"fmt"
 	"github.com/go-kit/kit/log"
 	kitgrpc "github.com/go-kit/kit/transport/grpc"
+	"github.com/oklog/oklog/pkg/group"
 	userpb "github.com/yuisofull/gommunigate/internal/usersvc/pb"
 	userendpoint "github.com/yuisofull/gommunigate/internal/usersvc/pkg/endpoint"
 	"github.com/yuisofull/gommunigate/internal/usersvc/pkg/infrastructure"
@@ -14,7 +13,7 @@ import (
 	usertransport "github.com/yuisofull/gommunigate/internal/usersvc/pkg/transport"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
-	"golang.org/x/sync/errgroup"
+	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 	"google.golang.org/grpc"
 	"net"
 	"os"
@@ -32,6 +31,8 @@ func main() {
 		mongodbCol = fs.String("mongodb-col", "users", "MongoDB collection")
 	)
 
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
 	// Create a single logger, which we'll use and give to other components.
 	var logger log.Logger
 	{
@@ -52,9 +53,15 @@ func main() {
 			logger.Log("err", err)
 			os.Exit(1)
 		}
-		logger.Log("Repository", "MongoDB", "URI", *mongodbURI, "DB", *mongodbDB, "Collection", *mongodbCol)
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
+
+		if err = client.Ping(ctx, readpref.Primary()); err != nil {
+			logger.Log("err", err)
+			os.Exit(1)
+		}
+		logger.Log("repository", "MongoDB", "uri", *mongodbURI, "db", *mongodbDB, "collection", *mongodbCol)
+
 		defer client.Disconnect(ctx)
 		repo = infrastructure.NewMongoRepository(client, *mongodbDB, *mongodbCol)
 	}
@@ -65,41 +72,34 @@ func main() {
 		grpcServer = usertransport.NewGRPCServer(endpoints, logger)
 	)
 
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
-
-	g, ctx := errgroup.WithContext(ctx)
+	var g group.Group
 	{
 		grpcListener, err := net.Listen("tcp", *grpcAddr)
 		if err != nil {
 			logger.Log("transport", "gRPC", "during", "Listen", "err", err)
 			os.Exit(1)
 		}
-		defer grpcListener.Close()
 
 		baseServer := grpc.NewServer(grpc.UnaryInterceptor(kitgrpc.Interceptor))
 		userpb.RegisterUserServer(baseServer, grpcServer)
 
-		g.Go(func() error {
+		g.Add(func() error {
 			logger.Log("transport", "gRPC", "addr", *grpcAddr)
 			return baseServer.Serve(grpcListener)
+		}, func(error) {
+			baseServer.GracefulStop()
+			_ = grpcListener.Close()
 		})
-		defer baseServer.GracefulStop()
 	}
 
 	{
-		g.Go(func() error {
-			c := make(chan os.Signal, 1)
-			signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+		g.Add(func() error {
 			select {
-			case sig := <-c:
-				return fmt.Errorf("received signal %s", sig)
+			case <-ctx.Done():
+				return ctx.Err()
 			}
-		})
+		}, nil)
 	}
-	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
-		logger.Log("err", err)
-		os.Exit(1)
-	}
-	logger.Log("info", "closing server gracefully")
+	logger.Log("exit", g.Run())
+
 }

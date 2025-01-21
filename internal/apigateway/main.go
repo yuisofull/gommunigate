@@ -5,18 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
-	"fmt"
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/sd"
 	"github.com/go-kit/kit/sd/lb"
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/gorilla/mux"
-	"github.com/yuisofull/gommunigate/internal/apigateway/tokenprovider/firebase"
+	"github.com/oklog/oklog/pkg/group"
 	userendpoint "github.com/yuisofull/gommunigate/internal/usersvc/pkg/endpoint"
 	userservice "github.com/yuisofull/gommunigate/internal/usersvc/pkg/service"
 	usertransport "github.com/yuisofull/gommunigate/internal/usersvc/pkg/transport"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"io"
 	"net"
@@ -32,11 +30,11 @@ import (
 
 func main() {
 	var (
-		httpAddr                     = flag.String("http.addr", ":8000", "Address for HTTP (JSON) server")
-		userServiceInstances         = flag.String("user-service-instances", "localhost:8081", "Optional comma-separated list of URLs to user service")
-		firebaseCredentialConfigFile = flag.String("firebase--credential-config-file", "/home/yui/github.com/yuisofull/gommunigate/internal/apigateway/etc/firebase-credential.json", "Firebase config file")
-		retryMax                     = flag.Int("retry.max", 3, "per-request retries to different instances")
-		retryTimeout                 = flag.Duration("retry.timeout", 500*time.Millisecond, "per-request timeout, including retries")
+		httpAddr             = flag.String("http.addr", ":8000", "Address for HTTP (JSON) server")
+		userServiceInstances = flag.String("user-service-instances", "localhost:8081", "Optional comma-separated list of URLs to user service")
+		//firebaseCredentialConfigFile = flag.String("firebase--credential-config-file", "/home/yui/github.com/yuisofull/gommunigate/internal/apigateway/etc/firebase-credential.json", "Firebase config file")
+		retryMax     = flag.Int("retry.max", 3, "per-request retries to different instances")
+		retryTimeout = flag.Duration("retry.timeout", 500*time.Millisecond, "per-request timeout, including retries")
 	)
 	flag.Parse()
 
@@ -94,8 +92,8 @@ func main() {
 
 		userRouter := r.PathPrefix("/user").Subrouter()
 
-		authMiddleware := AuthenticationMiddleware{TokenProvider: firebase.MustNewTokenProvider(*firebaseCredentialConfigFile)}.Middleware
-		userRouter.Use(authMiddleware)
+		//authMiddleware := &AuthenticationMiddleware{TokenProvider: firebase.MustNewTokenProvider(*firebaseCredentialConfigFile)}
+		//userRouter.Use(authMiddleware.Middleware)
 
 		userRouter.
 			Path("/{uid}").
@@ -118,38 +116,33 @@ func main() {
 			Methods(http.MethodDelete)
 	}
 
-	g, ctx := errgroup.WithContext(ctx)
+	var g group.Group
 	{
 		httpListener, err := net.Listen("tcp", *httpAddr)
 		if err != nil {
 			logger.Log("transport", "HTTP", "during", "Listen", "err", err)
 			os.Exit(1)
 		}
-		defer httpListener.Close()
 
-		g.Go(func() error {
+		g.Add(func() error {
 			logger.Log("transport", "HTTP", "addr", *httpAddr)
 			return http.Serve(httpListener, r)
+		}, func(error) {
+			_ = httpListener.Close()
 		})
 	}
 
 	{
-		g.Go(func() error {
-			c := make(chan os.Signal, 1)
-			signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+		g.Add(func() error {
 			select {
-			case sig := <-c:
-				return fmt.Errorf("received signal %s", sig)
+			case <-ctx.Done():
+				return ctx.Err()
 			}
-		})
+		}, nil)
 	}
 
-	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
-		logger.Log("err", err)
-		os.Exit(1)
-	}
+	logger.Log("exit", g.Run())
 
-	logger.Log("exit", "closing api-gateway")
 }
 
 func userSvcFactory(makeEndpoint func(userservice.Service) endpoint.Endpoint, logger log.Logger) sd.Factory {
@@ -186,11 +179,11 @@ func decodeGetProfileRequest(ctx context.Context, r *http.Request) (interface{},
 
 func decodeCreateProfileRequest(ctx context.Context, r *http.Request) (interface{}, error) {
 	var req userendpoint.CreateProfileRequest
-	claims, err := ClaimsFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	authProvider, _ := AuthProviderFromContext(ctx)
+	//claims, err := ClaimsFromContext(ctx)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//authProvider, _ := AuthProviderFromContext(ctx)
 
 	var request struct {
 		Email       *string `json:"email"`
@@ -202,14 +195,15 @@ func decodeCreateProfileRequest(ctx context.Context, r *http.Request) (interface
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		return nil, err
 	}
-	uuid := claims["user-id"].(string)
+	//uuid := claims["user-id"].(string)
+	uuid := "test"
 	req = userendpoint.CreateProfileRequest{
-		UUID:         &uuid,
-		Email:        request.Email,
-		PhoneNumber:  request.PhoneNumber,
-		UserName:     request.UserName,
-		Bio:          request.Bio,
-		AuthProvider: &authProvider,
+		UUID:        &uuid,
+		Email:       request.Email,
+		PhoneNumber: request.PhoneNumber,
+		UserName:    request.UserName,
+		Bio:         request.Bio,
+		//AuthProvider: &authProvider,
 	}
 	return req, nil
 }
