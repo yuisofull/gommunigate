@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package pb;
+
+option go_package = "github.com/yuisofull/gommunicate/internal/usersvc/pb";
+// The User service definition.
+service User {
+  // Creates a new user.
+  rpc Create (CreateRequest) returns (CreateReply) {}
+
+  // Retrieves a user by ID.
+  rpc Retrieve (RetrieveRequest) returns (RetrieveReply) {}
+
+  // Updates a user.
+  rpc Update (UpdateRequest) returns (UpdateReply) {}
+
+  // Deletes a user by ID.
+  rpc Delete (DeleteRequest) returns (DeleteReply) {}
+}
+
+// The create request contains the user to be created.
+message CreateRequest {
+  string uuid = 1;
+  string name = 2;
+  string email = 3;
+  string phone = 4;
+  string profile = 5;
+  string bio = 6;
+  string authProvider = 7;
+}
+
+// The create response contains the ID of the created user.
+message CreateReply {
+  string uuid = 1;
+  string err = 2;
+}
+
+// The retrieve request contains the ID of the user to be retrieved.
+message RetrieveRequest {
+  string uuid = 1;
+}
+
+// The retrieve response contains the user.
+message RetrieveReply {
+  string uuid = 1;
+  string name = 2;
+  string email = 3;
+  string phone = 4;
+  string profile = 5;
+  string bio = 6;
+  string authProvider = 7;
+  string err = 8;
+}
+
+// The update request contains the user to be updated.
+message UpdateRequest {
+  string uuid = 1;
+  string name = 2;
+  string email = 3;
+  string phone = 4;
+  string profile = 5;
+  string bio = 6;
+  string authProvider = 7;
+}
+
+// The update response contains the ID of the updated user.
+message UpdateReply {
+  string err = 1;
+}
+
+// The delete request contains the ID of the user to be deleted.
+message DeleteRequest {
+  string uuid = 1;
+}
+
+// The delete response contains the ID of the deleted user.
+message DeleteReply {
+  string err = 1;
+}
